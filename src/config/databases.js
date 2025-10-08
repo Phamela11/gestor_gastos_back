@@ -1,29 +1,29 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 
-// Configuración de la base de datos
+// Configuración de la base de datos PostgreSQL
 const dbConfig = {
-  host:'localhost',
-  user: 'root',
-  password: 'root',
-  database: 'gestor_gastos',
-  port: 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  host: 'localhost',
+  user: 'postgres',
+  password: '0',
+  database: 'licorera',
+  port: 5432,
+  max: 10, // máximo de conexiones en el pool
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 };
 
 // Crear pool de conexiones
-const pool = mysql.createPool(dbConfig);
+const pool = new Pool(dbConfig);
 
 // Función para probar la conexión
 async function testConnection() {
   try {
-    const connection = await pool.getConnection();
-    console.log('✅ Conexión a MySQL establecida correctamente');
-    connection.release();
+    const client = await pool.connect();
+    console.log('✅ Conexión a PostgreSQL establecida correctamente');
+    client.release();
     return true;
   } catch (error) {
-    console.error('❌ Error al conectar con MySQL:', error.message);
+    console.error('❌ Error al conectar con PostgreSQL:', error.message);
     return false;
   }
 }
