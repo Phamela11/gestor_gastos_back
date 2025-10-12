@@ -6,7 +6,8 @@ const createProduct = async (req, res) => {
         console.log('Datos recibidos para crear producto:', req.body);
         const { 
             nombre, 
-            tipo_licor, 
+            id_tipo_licor, 
+            id_proveedor,
             precio_compra, 
             precio_venta, 
             stock 
@@ -15,28 +16,55 @@ const createProduct = async (req, res) => {
         const fecha = new Date();
 
         // Validar que todos los campos requeridos estén presentes
-        if (!nombre || !tipo_licor || !precio_compra || !precio_venta) {
+        if (!nombre || !id_tipo_licor || !id_proveedor || !precio_compra || !precio_venta) {
             return res.status(400).json({
                 success: false,
-                message: 'Los campos nombre, tipo_licor, precio_compra y precio_venta son requeridos',
+                message: 'Los campos nombre, id_tipo_licor, id_proveedor, precio_compra y precio_venta son requeridos',
                 missing: {
                     nombre: !nombre,
-                    tipo_licor: !tipo_licor,
+                    id_tipo_licor: !id_tipo_licor,
+                    id_proveedor: !id_proveedor,
                     precio_compra: !precio_compra,
                     precio_venta: !precio_venta
                 }
             });
         }
 
-        // Insertar nuevo producto
-        const result = await pool.query(
-            'INSERT INTO producto (nombre, tipo_licor, precio_compra, precio_venta, fecha, stock) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_producto',
-            [nombre, tipo_licor, precio_compra, precio_venta, fecha, stock || 0]
+        // Verificar que el tipo de licor existe
+        const tipoLicorExists = await pool.query(
+            'SELECT id_tipo_licor FROM tipo_licor WHERE id_tipo_licor = $1',
+            [id_tipo_licor]
         );
 
-        // Obtener el producto creado
+        if (tipoLicorExists.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El tipo de licor especificado no existe'
+            });
+        }
+
+        // Verificar que el proveedor existe
+        const proveedorExists = await pool.query(
+            'SELECT id_proveedor FROM proveedor WHERE id_proveedor = $1',
+            [id_proveedor]
+        );
+
+        if (proveedorExists.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El proveedor especificado no existe'
+            });
+        }
+
+        // Insertar nuevo producto
+        const result = await pool.query(
+            'INSERT INTO producto (nombre, id_tipo_licor, id_proveedor, precio_compra, precio_venta, fecha, stock) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_producto',
+            [nombre, id_tipo_licor, id_proveedor, precio_compra, precio_venta, fecha, stock || 0]
+        );
+
+        // Obtener el producto creado con el nombre del tipo de licor y proveedor
         const newProduct = await pool.query(
-            'SELECT * FROM producto WHERE id_producto = $1',
+            'SELECT p.*, tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre FROM producto p LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor LEFT JOIN proveedor pr ON p.id_proveedor = pr.id_proveedor WHERE p.id_producto = $1',
             [result.rows[0].id_producto]
         );
         
@@ -60,7 +88,7 @@ const createProduct = async (req, res) => {
 const getAllProduct = async (req, res) => {
     try {
         const products = await pool.query(
-            'SELECT * FROM producto ORDER BY id_producto DESC'
+            'SELECT p.*, tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre FROM producto p LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor LEFT JOIN proveedor pr ON p.id_proveedor = pr.id_proveedor ORDER BY p.id_producto DESC'
         );
         
         res.status(200).json({
@@ -87,20 +115,22 @@ const updateProduct = async (req, res) => {
         
         const { 
             nombre, 
-            tipo_licor, 
+            id_tipo_licor, 
+            id_proveedor,
             precio_compra, 
             precio_venta, 
             stock 
         } = req.body;
 
         // Validar que todos los campos requeridos estén presentes
-        if (!nombre || !tipo_licor || !precio_compra || !precio_venta) {
+        if (!nombre || !id_tipo_licor || !id_proveedor || !precio_compra || !precio_venta) {
             return res.status(400).json({
                 success: false,
-                message: 'Los campos nombre, tipo_licor, precio_compra y precio_venta son requeridos para la actualización',
+                message: 'Los campos nombre, id_tipo_licor, id_proveedor, precio_compra y precio_venta son requeridos para la actualización',
                 missing: {
                     nombre: !nombre,
-                    tipo_licor: !tipo_licor,
+                    id_tipo_licor: !id_tipo_licor,
+                    id_proveedor: !id_proveedor,
                     precio_compra: !precio_compra,
                     precio_venta: !precio_venta
                 }
@@ -120,15 +150,41 @@ const updateProduct = async (req, res) => {
             });
         }
 
-        // Actualizar el producto
-        await pool.query(
-            'UPDATE producto SET nombre = $1, tipo_licor = $2, precio_compra = $3, precio_venta = $4, stock = $5 WHERE id_producto = $6',
-            [nombre, tipo_licor, precio_compra, precio_venta, stock || 0, id_product]
+        // Verificar que el tipo de licor existe
+        const tipoLicorExists = await pool.query(
+            'SELECT id_tipo_licor FROM tipo_licor WHERE id_tipo_licor = $1',
+            [id_tipo_licor]
         );
 
-        // Obtener el producto actualizado
+        if (tipoLicorExists.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El tipo de licor especificado no existe'
+            });
+        }
+
+        // Verificar que el proveedor existe
+        const proveedorExists = await pool.query(
+            'SELECT id_proveedor FROM proveedor WHERE id_proveedor = $1',
+            [id_proveedor]
+        );
+
+        if (proveedorExists.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El proveedor especificado no existe'
+            });
+        }
+
+        // Actualizar el producto
+        await pool.query(
+            'UPDATE producto SET nombre = $1, id_tipo_licor = $2, id_proveedor = $3, precio_compra = $4, precio_venta = $5, stock = $6 WHERE id_producto = $7',
+            [nombre, id_tipo_licor, id_proveedor, precio_compra, precio_venta, stock || 0, id_product]
+        );
+
+        // Obtener el producto actualizado con el nombre del tipo de licor y proveedor
         const updatedProduct = await pool.query(
-            'SELECT * FROM producto WHERE id_producto = $1',
+            'SELECT p.*, tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre FROM producto p LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor LEFT JOIN proveedor pr ON p.id_proveedor = pr.id_proveedor WHERE p.id_producto = $1',
             [id_product]
         );
         
