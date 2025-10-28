@@ -9,6 +9,8 @@ const productRoutes = require('./products');
 const customerRoutes = require('./customer');
 const licorType = require('./tplicor');
 const providerRoutes = require('./provider');
+const inventoryRoutes = require('./inventory');
+const inventoryMovementRoutes = require('./inventoryMovement');
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
@@ -16,4 +18,6 @@ router.use('/products', productRoutes);
 router.use('/customers', customerRoutes);
 router.use('/licor-type', licorType);
 router.use('/providers', providerRoutes);
+router.use('/inventory', inventoryRoutes);
+router.use('/inventory-movements', inventoryMovementRoutes);
 module.exports = router;
