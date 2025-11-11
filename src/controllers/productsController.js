@@ -12,10 +12,12 @@ const createProduct = async (req, res) => {
             id_tipo_licor, 
             id_proveedores, // Opcional: puede ser un array
             precio_compra, 
-            precio_venta
+            precio_venta,
+            utilidad // Porcentaje de utilidad
         } = req.body;
         
         const fecha = new Date();
+        const utilidadValue = parseFloat(utilidad) || 0;
 
         // Validar que todos los campos requeridos estén presentes (proveedores es opcional, puede ser array vacío)
         if (!nombre || !id_tipo_licor || precio_compra === undefined || precio_venta === undefined) {
@@ -63,8 +65,8 @@ const createProduct = async (req, res) => {
 
         // Insertar nuevo producto
         const result = await client.query(
-            'INSERT INTO producto (nombre, id_tipo_licor, precio_compra, precio_venta, fecha) VALUES ($1, $2, $3, $4, $5) RETURNING id_producto',
-            [nombre, id_tipo_licor, precio_compra, precio_venta, fecha]
+            'INSERT INTO producto (nombre, id_tipo_licor, precio_compra, precio_venta, utilidad, fecha) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_producto',
+            [nombre, id_tipo_licor, precio_compra, precio_venta, utilidadValue, fecha]
         );
 
         const productId = result.rows[0].id_producto;
@@ -83,7 +85,7 @@ const createProduct = async (req, res) => {
 
         // Obtener el producto creado
         const newProduct = await pool.query(
-            `SELECT p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.fecha,
+            `SELECT p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.utilidad, p.fecha,
                     tl.nombre as tipo_licor_nombre
              FROM producto p 
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor 
@@ -114,7 +116,7 @@ const createProduct = async (req, res) => {
 const getAllProduct = async (req, res) => {
     try {
         const products = await pool.query(
-            `SELECT p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.fecha,
+            `SELECT p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.utilidad, p.fecha,
                     tl.nombre as tipo_licor_nombre,
                     STRING_AGG(pr.nombre, ', ') as proveedores_nombres,
                     ARRAY_AGG(pr.id_proveedor) as proveedores_ids
@@ -122,7 +124,7 @@ const getAllProduct = async (req, res) => {
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor 
              LEFT JOIN proveedor_producto pp ON p.id_producto = pp.id_producto
              LEFT JOIN proveedor pr ON pp.id_proveedor = pr.id_proveedor 
-             GROUP BY p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.fecha, tl.nombre
+             GROUP BY p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.utilidad, p.fecha, tl.nombre
              ORDER BY p.id_producto DESC`
         );
         
@@ -156,8 +158,11 @@ const updateProduct = async (req, res) => {
             id_tipo_licor, 
             id_proveedores, // Opcional: puede ser un array
             precio_compra, 
-            precio_venta
+            precio_venta,
+            utilidad // Porcentaje de utilidad
         } = req.body;
+
+        const utilidadValue = parseFloat(utilidad) || 0;
 
         // Validar que todos los campos requeridos estén presentes (proveedores es opcional, puede ser array vacío)
         if (!nombre || !id_tipo_licor || precio_compra === undefined || precio_venta === undefined) {
@@ -218,8 +223,8 @@ const updateProduct = async (req, res) => {
 
         // Actualizar el producto
         await client.query(
-            'UPDATE producto SET nombre = $1, id_tipo_licor = $2, precio_compra = $3, precio_venta = $4 WHERE id_producto = $5',
-            [nombre, id_tipo_licor, precio_compra, precio_venta, id_product]
+            'UPDATE producto SET nombre = $1, id_tipo_licor = $2, precio_compra = $3, precio_venta = $4, utilidad = $5 WHERE id_producto = $6',
+            [nombre, id_tipo_licor, precio_compra, precio_venta, utilidadValue, id_product]
         );
 
         // Eliminar todas las relaciones existentes de proveedor_producto
@@ -242,7 +247,7 @@ const updateProduct = async (req, res) => {
 
         // Obtener el producto actualizado
         const updatedProduct = await pool.query(
-            `SELECT p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.fecha,
+            `SELECT p.id_producto, p.nombre, p.id_tipo_licor, p.precio_compra, p.precio_venta, p.utilidad, p.fecha,
                     tl.nombre as tipo_licor_nombre
              FROM producto p 
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor 

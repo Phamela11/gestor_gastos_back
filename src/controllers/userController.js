@@ -4,20 +4,22 @@ const { pool } = require('../config/databases');
 const createUser = async (req, res) => {
     try {
         console.log('Datos recibidos:', req.body);
-        // Mapear los nombres de campos del frontend a los nombres esperados
-        const { 
-            nombre_completo, 
-            telefono, 
-            email, 
-            contraseña, 
-            rol 
-        } = req.body;
-        
-        // Usar los valores mapeados o los originales como fallback
-        const nombre = nombre_completo || req.body.nombre;
-        const correo = email || req.body.correo;
-        const contrasena = contraseña || req.body.contrasena;
-        const fecha = new Date();
+    // Mapear los nombres de campos del frontend a los nombres esperados
+    const { 
+        nombre_completo, 
+        telefono, 
+        email, 
+        contraseña, 
+        rol,
+        valor_hora 
+    } = req.body;
+    
+    // Usar los valores mapeados o los originales como fallback
+    const nombre = nombre_completo || req.body.nombre;
+    const correo = email || req.body.correo;
+    const contrasena = contraseña || req.body.contrasena;
+    const valorHora = valor_hora || 0; // Valor por defecto 0
+    const fecha = new Date();
 
 
         // Verificar si el usuario ya existe
@@ -36,18 +38,18 @@ const createUser = async (req, res) => {
         // Hash de la contraseña (en producción usarías bcrypt)
         const hashedPassword = contrasena; // Por ahora sin hash
         
-        // Insertar nuevo usuario
-        const result = await pool.query(
-            'INSERT INTO usuario (nombre, correo, fecha, telefono, contrasena, id_rol) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_usuario',
-            [nombre, correo, fecha, telefono, hashedPassword, rol]
-        );
+    // Insertar nuevo usuario
+    const result = await pool.query(
+        'INSERT INTO usuario (nombre, correo, fecha, telefono, contrasena, id_rol, valor_hora) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_usuario',
+        [nombre, correo, fecha, telefono, hashedPassword, rol, valorHora]
+    );
 
         
-        // Obtener el usuario creado con el nombre del rol
-        const newUser = await pool.query(
-            'SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.fecha, u.id_rol, r.nombre as rol_nombre FROM usuario u JOIN rol r ON u.id_rol = r.id_rol WHERE u.id_usuario = $1',
-            [result.rows[0].id_usuario]
-        );
+    // Obtener el usuario creado con el nombre del rol
+    const newUser = await pool.query(
+        'SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.fecha, u.id_rol, u.valor_hora, r.nombre as rol_nombre FROM usuario u JOIN rol r ON u.id_rol = r.id_rol WHERE u.id_usuario = $1',
+        [result.rows[0].id_usuario]
+    );
         
         res.status(201).json({
             success: true,
@@ -128,13 +130,15 @@ const updateUser = async (req, res) => {
             telefono, 
             email, 
             contraseña, 
-            rol 
+            rol,
+            valor_hora 
         } = req.body;
         
         // Usar los valores mapeados o los originales como fallback
         const nombre = nombre_completo || req.body.nombre;
         const correo = email || req.body.correo;
         const contrasena = contraseña || req.body.contrasena;
+        const valorHora = valor_hora !== undefined ? valor_hora : 0;
 
         // Validar que todos los campos requeridos estén presentes (excepto contraseña que es opcional)
         if (!nombre || !telefono || !correo || !rol) {
@@ -160,19 +164,19 @@ const updateUser = async (req, res) => {
                 message: 'Usuario no encontrado'
             });
         }
-        // Si se proporciona contraseña, actualizar todos los campos incluyendo contraseña
-        if (contrasena) {
-            await pool.query(
-                'UPDATE usuario SET nombre = $1, telefono = $2, correo = $3, contrasena = $4, id_rol = $5 WHERE id_usuario = $6',
-                [nombre, telefono, correo, contrasena, rol, id_usuario]
-            );
-        } else {
-            // Si no se proporciona contraseña, actualizar solo los otros campos
-            await pool.query(
-                'UPDATE usuario SET nombre = $1, telefono = $2, correo = $3, id_rol = $4 WHERE id_usuario = $5',
-                [nombre, telefono, correo, rol, id_usuario]
-            );
-        }
+    // Si se proporciona contraseña, actualizar todos los campos incluyendo contraseña
+    if (contrasena) {
+        await pool.query(
+            'UPDATE usuario SET nombre = $1, telefono = $2, correo = $3, contrasena = $4, id_rol = $5, valor_hora = $6 WHERE id_usuario = $7',
+            [nombre, telefono, correo, contrasena, rol, valorHora, id_usuario]
+        );
+    } else {
+        // Si no se proporciona contraseña, actualizar solo los otros campos
+        await pool.query(
+            'UPDATE usuario SET nombre = $1, telefono = $2, correo = $3, id_rol = $4, valor_hora = $5 WHERE id_usuario = $6',
+            [nombre, telefono, correo, rol, valorHora, id_usuario]
+        );
+    }
         res.status(200).json({
             success: true,
             message: 'Usuario actualizado exitosamente'

@@ -21,18 +21,18 @@ const registerUser = async (req, res) => {
         // Hash de la contraseña (en producción usarías bcrypt)
         const hashedPassword = contrasena; // Por ahora sin hash
         
-        const fecha_creacion = new Date();
-        // Insertar nuevo usuario
-        const result = await pool.query(
-            'INSERT INTO usuario (nombre, correo, fecha, telefono, contrasena, id_rol) VALUES ($1, $2, $3, $4, $5, $6)',
-            [nombre, correo, fecha, telefono, hashedPassword, id_rol]
-        );
+    const fecha_creacion = new Date();
+    // Insertar nuevo usuario
+    const result = await pool.query(
+        'INSERT INTO usuario (nombre, correo, fecha, telefono, contrasena, id_rol) VALUES ($1, $2, $3, $4, $5, $6)',
+        [nombre, correo, fecha, telefono, hashedPassword, id_rol]
+    );
         
-        // Obtener el usuario creado con el nombre del rol
-        const newUser = await pool.query(
-            'SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.id_rol, r.nombre as rol_nombre FROM usuario u JOIN rol r ON u.id_rol = r.id_rol WHERE u.id_usuario = $1',
-            [result.rows[0].id_usuario]
-        );
+    // Obtener el usuario creado con el nombre del rol
+    const newUser = await pool.query(
+        'SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.id_rol, r.nombre as rol_nombre FROM usuario u JOIN rol r ON u.id_rol = r.id_rol WHERE u.id_usuario = $1',
+        [result.rows[0].id_usuario]
+    );
         
         res.status(201).json({
             success: true,

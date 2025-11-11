@@ -12,7 +12,8 @@ const createInventoryMovement = async (req, res) => {
             id_inventario, 
             tipo_movimiento, 
             cantidad, 
-            precio_unitario
+            precio_unitario,
+            id_proveedor
         } = req.body;
         
         // Validar que todos los campos requeridos estén presentes
@@ -26,6 +27,14 @@ const createInventoryMovement = async (req, res) => {
                     cantidad: !cantidad,
                     precio_unitario: precio_unitario === undefined
                 }
+            });
+        }
+        
+        // Validar proveedor si es una entrada
+        if (tipo_movimiento === 'ENTRADA' && !id_proveedor) {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo id_proveedor es requerido para movimientos de ENTRADA'
             });
         }
 
@@ -80,8 +89,8 @@ const createInventoryMovement = async (req, res) => {
 
         // Insertar nuevo movimiento
         const result = await client.query(
-            'INSERT INTO movimiento_inventario (id_inventario, tipo_movimiento, cantidad, precio_unitario) VALUES ($1, $2, $3, $4) RETURNING id_movimiento',
-            [id_inventario, tipo_movimiento, cantidad, precio_unitario]
+            'INSERT INTO movimiento_inventario (id_inventario, tipo_movimiento, cantidad, precio_unitario, id_proveedor) VALUES ($1, $2, $3, $4, $5) RETURNING id_movimiento',
+            [id_inventario, tipo_movimiento, cantidad, precio_unitario, id_proveedor || null]
         );
 
         // Calcular nueva cantidad de stock
@@ -104,11 +113,12 @@ const createInventoryMovement = async (req, res) => {
         // Obtener el movimiento creado con información del inventario y producto
         const newMovement = await client.query(
             `SELECT m.*, i.cantidad as stock_actual, p.nombre as producto_nombre, p.precio_compra, p.precio_venta,
-                    tl.nombre as tipo_licor_nombre 
+                    tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre
              FROM movimiento_inventario m 
              LEFT JOIN inventario i ON m.id_inventario = i.id_inventario 
              LEFT JOIN producto p ON i.id_producto = p.id_producto 
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor 
+             LEFT JOIN proveedor pr ON m.id_proveedor = pr.id_proveedor
              WHERE m.id_movimiento = $1`,
             [result.rows[0].id_movimiento]
         );
@@ -139,11 +149,12 @@ const getAllInventoryMovements = async (req, res) => {
     try {
         const movements = await pool.query(
             `SELECT m.*, i.cantidad as stock_actual, p.nombre as producto_nombre, p.precio_compra, p.precio_venta,
-                    tl.nombre as tipo_licor_nombre 
+                    tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre
              FROM movimiento_inventario m 
              LEFT JOIN inventario i ON m.id_inventario = i.id_inventario 
              LEFT JOIN producto p ON i.id_producto = p.id_producto 
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor
+             LEFT JOIN proveedor pr ON m.id_proveedor = pr.id_proveedor
              ORDER BY m.fecha_movimiento DESC`
         );
         
@@ -170,11 +181,12 @@ const getInventoryMovementById = async (req, res) => {
         
         const movement = await pool.query(
             `SELECT m.*, i.cantidad as stock_actual, p.nombre as producto_nombre, p.precio_compra, p.precio_venta,
-                    tl.nombre as tipo_licor_nombre 
+                    tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre
              FROM movimiento_inventario m 
              LEFT JOIN inventario i ON m.id_inventario = i.id_inventario 
              LEFT JOIN producto p ON i.id_producto = p.id_producto 
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor 
+             LEFT JOIN proveedor pr ON m.id_proveedor = pr.id_proveedor
              WHERE m.id_movimiento = $1`,
             [id]
         );
@@ -221,11 +233,12 @@ const getMovementsByInventory = async (req, res) => {
 
         const movements = await pool.query(
             `SELECT m.*, i.cantidad as stock_actual, p.nombre as producto_nombre, p.precio_compra, p.precio_venta,
-                    tl.nombre as tipo_licor_nombre 
+                    tl.nombre as tipo_licor_nombre, pr.nombre as proveedor_nombre
              FROM movimiento_inventario m 
              LEFT JOIN inventario i ON m.id_inventario = i.id_inventario 
              LEFT JOIN producto p ON i.id_producto = p.id_producto 
              LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor
+             LEFT JOIN proveedor pr ON m.id_proveedor = pr.id_proveedor
              WHERE m.id_inventario = $1 
              ORDER BY m.fecha_movimiento DESC`,
             [id]

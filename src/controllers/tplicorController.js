@@ -3,7 +3,7 @@ const { pool } = require('../config/databases');
 // Crear tipo de licor
 const createTipoLicor = async (req, res) => {
     try {
-        const { nombre } = req.body;
+        const { nombre, iva } = req.body;
 
         if (!nombre) {
             return res.status(400).json({
@@ -12,9 +12,18 @@ const createTipoLicor = async (req, res) => {
             });
         }
 
+        // Validar que el IVA sea un número válido
+        const ivaValue = parseInt(iva) || 0;
+        if (ivaValue < 0 || ivaValue > 100) {
+            return res.status(400).json({
+                success: false,
+                message: 'El IVA debe estar entre 0 y 100'
+            });
+        }
+
         const result = await pool.query(
-            'INSERT INTO tipo_licor (nombre) VALUES ($1) RETURNING id_tipo_licor, nombre',
-            [nombre]
+            'INSERT INTO tipo_licor (nombre, iva) VALUES ($1, $2) RETURNING id_tipo_licor, nombre, iva',
+            [nombre, ivaValue]
         );
 
         res.status(201).json({
@@ -58,12 +67,21 @@ const getAllTipoLicor = async (req, res) => {
 const updateTipoLicor = async (req, res) => {
     try {
         const { id_tipo_licor } = req.params;
-        const { nombre } = req.body;
+        const { nombre, iva } = req.body;
 
         if (!nombre) {
             return res.status(400).json({
                 success: false,
                 message: 'El campo nombre es requerido para la actualización'
+            });
+        }
+
+        // Validar que el IVA sea un número válido
+        const ivaValue = parseInt(iva) || 0;
+        if (ivaValue < 0 || ivaValue > 100) {
+            return res.status(400).json({
+                success: false,
+                message: 'El IVA debe estar entre 0 y 100'
             });
         }
 
@@ -80,8 +98,8 @@ const updateTipoLicor = async (req, res) => {
         }
 
         await pool.query(
-            'UPDATE tipo_licor SET nombre = $1 WHERE id_tipo_licor = $2',
-            [nombre, id_tipo_licor]
+            'UPDATE tipo_licor SET nombre = $1, iva = $2 WHERE id_tipo_licor = $3',
+            [nombre, ivaValue, id_tipo_licor]
         );
 
         const updated = await pool.query(
