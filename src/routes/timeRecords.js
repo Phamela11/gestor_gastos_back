@@ -14,4 +14,3 @@ router.put('/:id_registro', updateTimeRecord);
 
 module.exports = router;
 
-

@@ -14,6 +14,8 @@ const inventoryMovementRoutes = require('./inventoryMovement');
 const saleRoutes = require('./sale');
 const reportsRoutes = require('./reports');
 const timeRecordsRoutes = require('./timeRecords');
+const nominaRoutes = require('./nomina');
+const costosOperativosRoutes = require('./costosOperativos');
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
@@ -26,5 +28,7 @@ router.use('/inventory-movements', inventoryMovementRoutes);
 router.use('/sales', saleRoutes);
 router.use('/reports', reportsRoutes);
 router.use('/time-records', timeRecordsRoutes);
+router.use('/nomina', nominaRoutes);
+router.use('/costos-operativos', costosOperativosRoutes);
 
 module.exports = router;

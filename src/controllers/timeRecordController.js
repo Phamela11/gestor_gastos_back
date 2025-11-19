@@ -11,6 +11,7 @@ const getAllTimeRecords = async (req, res) => {
                 u.nombre as empleado_nombre,
                 rh.hora_entrada,
                 rh.hora_salida,
+                COALESCE(rh.descanso, 0) as descanso,
                 rh.horas_trabajadas,
                 CASE 
                     WHEN rh.hora_salida IS NULL THEN 'En Progreso'
@@ -47,6 +48,7 @@ const createTimeRecord = async (req, res) => {
             empleado_id, 
             hora_entrada, 
             hora_salida, 
+            descanso,
             observaciones 
         } = req.body;
 
@@ -72,13 +74,24 @@ const createTimeRecord = async (req, res) => {
         }
 
         // Insertar nuevo registro
+        console.log('Intentando insertar registro con:', {
+            fecha,
+            empleado_id,
+            hora_entrada,
+            hora_salida: hora_salida || null,
+            descanso: descanso || 0,
+            observaciones: observaciones || null
+        });
+        
         const result = await pool.query(
             `INSERT INTO registro_horas 
-            (fecha, id_usuario, hora_entrada, hora_salida, observacion) 
-            VALUES ($1, $2, $3, $4, $5) 
+            (fecha, id_usuario, hora_entrada, hora_salida, descanso, observacion) 
+            VALUES ($1, $2, $3, $4, $5, $6) 
             RETURNING id_registro`,
-            [fecha, empleado_id, hora_entrada, hora_salida || null, observaciones || null]
+            [fecha, empleado_id, hora_entrada, hora_salida || null, descanso || 0, observaciones || null]
         );
+        
+        console.log('Registro insertado exitosamente:', result.rows[0]);
 
         // Obtener el registro creado completo
         const newRecord = await pool.query(`
@@ -89,6 +102,7 @@ const createTimeRecord = async (req, res) => {
                 u.nombre as empleado_nombre,
                 rh.hora_entrada,
                 rh.hora_salida,
+                COALESCE(rh.descanso, 0) as descanso,
                 rh.horas_trabajadas,
                 CASE 
                     WHEN rh.hora_salida IS NULL THEN 'En Progreso'
@@ -107,10 +121,12 @@ const createTimeRecord = async (req, res) => {
         });
     } catch (error) {
         console.error('Error en createTimeRecord:', error);
+        console.error('Stack completo:', error.stack);
         res.status(500).json({
             success: false,
             message: 'Error al crear registro de tiempo',
-            error: error.message
+            error: error.message,
+            details: error.detail || error.stack
         });
     }
 };
@@ -125,7 +141,8 @@ const updateTimeRecord = async (req, res) => {
             fecha, 
             empleado_id, 
             hora_entrada, 
-            hora_salida, 
+            hora_salida,
+            descanso,
             observaciones 
         } = req.body;
 
@@ -148,10 +165,11 @@ const updateTimeRecord = async (req, res) => {
             SET fecha = $1, 
                 id_usuario = $2, 
                 hora_entrada = $3, 
-                hora_salida = $4, 
-                observacion = $5
-            WHERE id_registro = $6`,
-            [fecha, empleado_id, hora_entrada, hora_salida || null, observaciones || null, id_registro]
+                hora_salida = $4,
+                descanso = $5,
+                observacion = $6
+            WHERE id_registro = $7`,
+            [fecha, empleado_id, hora_entrada, hora_salida || null, descanso || 0, observaciones || null, id_registro]
         );
 
         res.status(200).json({

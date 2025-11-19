@@ -24,7 +24,29 @@ async function initializeDatabase() {
 // Middleware básico
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+
+// Configuración de CORS para permitir cualquier origen
+const corsOptions = {
+  origin: [
+    "https://9b6d32dd1336.ngrok-free.app",
+    "http://localhost:5173",
+    "192.168.40.88:5173"
+  ],
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-User-Id',
+    'Accept',
+    'Origin',
+    'X-Requested-With',
+    'ngrok-skip-browser-warning'
+  ]
+};
+
+// Aplicar CORS antes de las rutas
+app.use(cors(corsOptions));
 
 // Routes
 app.use('/api', indexRoutes);
@@ -34,8 +56,11 @@ app.get('/', (req, res) => {
   res.json({ message: 'API funcionando' });
 });
 
-app.listen(PORT, async () => {
+// Escuchar en todas las interfaces de red (0.0.0.0) para permitir conexiones externas
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`🌐 Accesible desde: http://localhost:${PORT} y http://0.0.0.0:${PORT}`);
+  console.log(`📡 CORS configurado para permitir cualquier origen`);
   await initializeDatabase();
 });
 

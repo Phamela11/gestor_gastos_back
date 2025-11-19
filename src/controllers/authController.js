@@ -3,7 +3,8 @@ const { pool } = require('../config/databases');
 //Funcion para registrar un usuario
 const registerUser = async (req, res) => {
     try {
-        const { nombre, correo, telefono, contrasena, id_rol } = req.body;
+        const { nombre, correo, telefono, contrasena, id_rol, valor_hora } = req.body;
+        const valorHora = valor_hora !== undefined ? valor_hora : 0;
 
         // Verificar si el usuario ya existe
         const existingUsers = await pool.query(

@@ -18,9 +18,9 @@ const getDashboardStats = async (req, res) => {
             'SELECT COUNT(*) as total FROM cliente'
         );
 
-        // Productos con stock bajo (menos de 10 unidades)
+        // Productos con stock bajo (menos de 15 unidades)
         const stockBajo = await pool.query(
-            'SELECT COUNT(*) as total FROM inventario WHERE cantidad < 10'
+            'SELECT COUNT(*) as total FROM inventario WHERE cantidad < 15'
         );
 
         res.status(200).json({
@@ -82,21 +82,44 @@ const getSalesByPeriod = async (req, res) => {
 // Obtener top productos más vendidos
 const getTopProducts = async (req, res) => {
     try {
-        const { limit = 10 } = req.query;
+        const { limit = 10, periodo = 'mensual' } = req.query;
+
+        // Determinar el rango de fechas según el período
+        let fechaFiltro = '';
+        if (periodo === 'diario') {
+            fechaFiltro = "AND DATE(v.fecha) = CURRENT_DATE";
+        } else if (periodo === 'semanal') {
+            fechaFiltro = "AND v.fecha >= CURRENT_DATE - INTERVAL '7 days'";
+        } else if (periodo === 'mensual') {
+            fechaFiltro = "AND v.fecha >= DATE_TRUNC('month', CURRENT_DATE)";
+        }
 
         const query = `
+            WITH productos_expandidos AS (
+                SELECT 
+                    v.id_venta,
+                    v.fecha,
+                    (producto_item->>'id_producto')::int as id_producto,
+                    (producto_item->>'cantidad')::int as cantidad,
+                    (producto_item->>'subtotal')::numeric as subtotal
+                FROM venta v
+                INNER JOIN detalle_venta dv ON v.id_detalle_venta = dv.id_detalle_venta
+                CROSS JOIN LATERAL jsonb_array_elements(dv.productos) AS producto_item
+                WHERE v.fecha IS NOT NULL ${fechaFiltro}
+            )
             SELECT 
                 p.id_producto,
                 p.nombre,
                 tl.nombre as tipo_licor,
-                COUNT(dv.id_detalle_venta) as veces_vendido,
-                SUM((productos->>'cantidad')::int) as cantidad_total,
-                SUM((productos->>'subtotal')::numeric) as ventas_totales
+                p.precio_compra,
+                COUNT(DISTINCT pe.id_venta) as veces_vendido,
+                SUM(pe.cantidad) as cantidad_total,
+                SUM(pe.subtotal) as ventas_totales,
+                SUM(pe.cantidad * p.precio_compra) as costo_total
             FROM producto p
             LEFT JOIN tipo_licor tl ON p.id_tipo_licor = tl.id_tipo_licor
-            LEFT JOIN detalle_venta dv ON dv.productos @> jsonb_build_array(jsonb_build_object('id_producto', p.id_producto))
-            WHERE dv.id_detalle_venta IS NOT NULL
-            GROUP BY p.id_producto, p.nombre, tl.nombre
+            INNER JOIN productos_expandidos pe ON pe.id_producto = p.id_producto
+            GROUP BY p.id_producto, p.nombre, tl.nombre, p.precio_compra
             ORDER BY cantidad_total DESC
             LIMIT $1
         `;
@@ -105,14 +128,24 @@ const getTopProducts = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: result.rows.map(row => ({
-                id_producto: row.id_producto,
-                nombre: row.nombre,
-                tipo_licor: row.tipo_licor,
-                veces_vendido: parseInt(row.veces_vendido) || 0,
-                cantidad_total: parseInt(row.cantidad_total) || 0,
-                ventas_totales: parseFloat(row.ventas_totales) || 0
-            }))
+            data: result.rows.map(row => {
+                const ventasTotales = parseFloat(row.ventas_totales) || 0;
+                const costoTotal = parseFloat(row.costo_total) || 0;
+                const ganancia = ventasTotales - costoTotal;
+                const margenGanancia = ventasTotales > 0 ? ((ganancia / ventasTotales) * 100) : 0;
+
+                return {
+                    id_producto: row.id_producto,
+                    nombre: row.nombre,
+                    tipo_licor: row.tipo_licor,
+                    veces_vendido: parseInt(row.veces_vendido) || 0,
+                    cantidad_total: parseInt(row.cantidad_total) || 0,
+                    ventas_totales: ventasTotales,
+                    costo_total: costoTotal,
+                    ganancia: ganancia,
+                    margen_ganancia: margenGanancia
+                };
+            })
         });
     } catch (error) {
         console.error('Error en getTopProducts:', error);
@@ -192,7 +225,7 @@ const getInventoryStatus = async (req, res) => {
                 cantidad: parseInt(row.cantidad),
                 precio_venta: parseFloat(row.precio_venta),
                 valor_stock: parseFloat(row.valor_stock),
-                estado: row.cantidad < 10 ? 'bajo' : row.cantidad < 50 ? 'medio' : 'alto'
+                estado: row.cantidad < 15 ? 'bajo' : row.cantidad < 50 ? 'medio' : 'alto'
             }))
         });
     } catch (error) {
@@ -212,13 +245,14 @@ const getSalesByUser = async (req, res) => {
             SELECT 
                 u.id_usuario,
                 u.nombre,
-                u.rol,
+                r.nombre as rol,
                 COUNT(v.id_venta) as cantidad_ventas,
                 COALESCE(SUM(v.total), 0) as total_ventas
             FROM usuario u
+            LEFT JOIN rol r ON u.id_rol = r.id_rol
             LEFT JOIN venta v ON u.id_usuario = v.id_usuario
             WHERE v.id_venta IS NOT NULL
-            GROUP BY u.id_usuario, u.nombre, u.rol
+            GROUP BY u.id_usuario, u.nombre, r.nombre
             ORDER BY total_ventas DESC
         `;
 
